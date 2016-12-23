@@ -1,0 +1,6 @@
+*.so
+*.html
+*.c
+build/*
+.ipynb_checkpoints/*
+*.npy
