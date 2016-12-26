@@ -4,3 +4,4 @@
 build/*
 .ipynb_checkpoints/*
 *.npy
+__pycache__/*
