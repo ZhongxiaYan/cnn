@@ -73,7 +73,7 @@ class NN:
                 accuracy_scores.append(score)
                 print('  Accuracy score: %.6f   Loss: %.6f' % (score, J))
                 for layer in self.layers:
-                    layer.decayLearningRate()
+                    layer.decay_learning_rate()
                 epoch_count -= calc_loss_thres
             epoch_count += self.n_batch
         if plot:
@@ -91,7 +91,8 @@ class NN:
     def predict(self, X, labels=None):
         if labels is None: # we're predicting test data in this case
             X = self.preprocess_X(X)
-        layers = [layer.getClone(len(X), 0) for layer in self.layers]
+        N = len(X)
+        layers = [layer.get_clone(N) for layer in self.layers]
         out = X
         for layer in itertools.islice(layers, len(layers) - 1):
             out = layer.forward(out)
@@ -154,10 +155,14 @@ def create_generator(n_in, n_out):
         n_batch = 20
         n_hidden1 = 400
         n_hidden2 = 100
-        ReLU1 = ReLULayer(n_in, n_hidden1, n_batch, learning_rate=5e-1, dropout_rate=0.05, decay_rate=0.9, add_bias=False, calculate_dJ_din=False)
-        ReLU2 = ReLULayer(n_hidden1, n_hidden2, n_batch, learning_rate=5e-2, dropout_rate=0.1, decay_rate=0.9, add_bias=True, calculate_dJ_din=True)
-        softmax = SoftmaxLayer(n_hidden1, n_out, n_batch, learning_rate=2e-2, dropout_rate=0.5, decay_rate=0.9)
-        return NN([ReLU1, softmax], n_batch)
+        relu_FC_init = lambda n_in, n_out: np.sqrt(2.0 / (n_in + n_out + 1))
+        softmax_FC_init = lambda n_in, n_out: np.sqrt(1.0 / (n_in))
+        FC_ReLU_1 = FullyConnectedLayer(n_in, n_hidden1, n_batch, learning_rate=5e-1, dropout_rate=0.05, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
+        ReLU_1 = ReLULayer(n_hidden1, n_batch)
+        # ReLU_2 = ReLULayer(n_hidden1, n_hidden2, n_batch, learning_rate=5e-2, dropout_rate=0.1, decay_rate=0.9)
+        FC_softmax = FullyConnectedLayer(n_hidden1, n_out, n_batch, learning_rate=2e-2, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_FC_init)
+        softmax = SoftmaxLayer(n_out, n_batch)
+        return NN([FC_ReLU_1, ReLU_1, FC_softmax, softmax], n_batch)
     return generator
 
 if __name__ == "__main__":
