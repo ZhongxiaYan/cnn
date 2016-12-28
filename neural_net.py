@@ -77,16 +77,12 @@ class NN:
                 epoch_count -= calc_loss_thres
             epoch_count += self.n_batch
         if plot:
-            plt.plot([i for i in range(len(losses))], losses)
-            plt.title('Training loss vs iterations')
-            plt.xlabel('%s of Iterations' % (calc_loss_thres))
-            plt.ylabel('Loss')
-            plt.show()
-            plt.plot([i for i in range(len(accuracy_scores))], accuracy_scores)
-            plt.title('Training accuracy vs iterations')
-            plt.xlabel('%s of Iterations' % (calc_loss_thres))
-            plt.ylabel('Accuracy')
-            plt.show()
+            for y_var, label in [(losses, 'loss'), (accuracy_scores, 'accuracy')]: # plot training loss and accuracy vs iterations
+                plt.plot([i for i in range(len(y_var))], y_var)
+                plt.title('Training %s vs iterations' % (label))
+                plt.xlabel('%s of Iterations' % (calc_loss_thres))
+                plt.ylabel(y_var)
+                plt.show()
 
     def predict(self, X, labels=None):
         if labels is None: # we're predicting test data in this case

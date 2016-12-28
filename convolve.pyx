@@ -80,11 +80,17 @@ def conv_backward_input(np.ndarray[np.float_t, ndim=1] dJ_dout, np.ndarray[np.fl
         ip = i + padding
         m = ip // stride
         a = ip % stride
+        if m >= dim_output:
+            a += stride * (m - dim_output + 1)
+            m = dim_output - 1
         for j in range(dim_input):
             jp = j + padding
             n = jp // stride
             b = jp % stride
             dJ_dinput_ij = 0
+            if n >= dim_output:
+                b += stride * (n - dim_output + 1)
+                n = dim_output - 1
             m_iter = m
             a_iter = a
             while m_iter >= 0 and a_iter < dim_W:
