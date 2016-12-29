@@ -154,7 +154,7 @@ def create_generator(n_in, n_out):
         relu_FC_init = lambda n_in, n_out: np.sqrt(2.0 / (n_in + n_out + 1))
         softmax_FC_init = lambda n_in, n_out: np.sqrt(1.0 / (n_in))
         FC_ReLU_1 = FullyConnectedLayer(n_in, n_hidden1, n_batch, learning_rate=5e-1, dropout_rate=0.05, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
-        ReLU_1 = ReLULayer(n_hidden1, n_batch)
+        ReLU_1 = ReLULayer((n_hidden1,), n_batch)
         # ReLU_2 = ReLULayer(n_hidden1, n_hidden2, n_batch, learning_rate=5e-2, dropout_rate=0.1, decay_rate=0.9)
         FC_softmax = FullyConnectedLayer(n_hidden1, n_out, n_batch, learning_rate=2e-2, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_FC_init)
         softmax = SoftmaxLayer(n_out, n_batch)
