@@ -53,7 +53,7 @@ class NN:
         X_processed = self.preprocess_X(X)
         labels_processed = self.preprocess_labels(labels)
         N = len(X_processed)
-        
+
         calc_loss_thres = N # number of samples before calculating loss
         if plot and self.n_batch == 1:
             calc_loss_thres = 10000
@@ -153,11 +153,11 @@ def create_generator(n_in, n_out):
         n_hidden2 = 100
         relu_FC_init = lambda n_in, n_out: np.sqrt(2.0 / (n_in + n_out + 1))
         softmax_FC_init = lambda n_in, n_out: np.sqrt(1.0 / (n_in))
-        FC_ReLU_1 = FullyConnectedLayer(n_in, n_hidden1, n_batch, learning_rate=5e-1, dropout_rate=0.05, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
-        ReLU_1 = ReLULayer((n_hidden1,), n_batch)
+        FC_ReLU_1 = FullyConnectedLayer(n_batch, n_in, n_hidden1, learning_rate=5e-1, dropout_rate=0.05, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
+        ReLU_1 = ReLULayer(n_batch, (n_hidden1,))
         # ReLU_2 = ReLULayer(n_hidden1, n_hidden2, n_batch, learning_rate=5e-2, dropout_rate=0.1, decay_rate=0.9)
-        FC_softmax = FullyConnectedLayer(n_hidden1, n_out, n_batch, learning_rate=2e-2, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_FC_init)
-        softmax = SoftmaxLayer(n_out, n_batch)
+        FC_softmax = FullyConnectedLayer(n_batch, n_hidden1, n_out, learning_rate=2e-2, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_FC_init)
+        softmax = SoftmaxLayer(n_batch, n_out)
         return NN([FC_ReLU_1, ReLU_1, FC_softmax, softmax], n_batch)
     return generator
 

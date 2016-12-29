@@ -1,4 +1,5 @@
 import numpy as np
+from convolve import *
 import matplotlib.pyplot as plt
 
 class Layer:
@@ -22,12 +23,15 @@ class Layer:
 
 class FullyConnectedLayer(Layer):
     '''
-    Fully connects n_in inputs to n_out outputs. The weight matrix will be <n_out> * (<n_in> + 1) to account for the bias
-    init_std: a function that takes in n_in and n_out and returns the standard deviation used to initialize the weights
-    add_bias: by default assume that each input point has n_in values (so add_bias=True appends a 1 to the end of the inputs)
-    calc_dJ_din: by default assume that we need to calculate gradient of loss w.r.t. input. Set to false if first layer
+    Fully connects n_in inputs to n_out outputs. The weight matrix will be <n_out> * (<n_in> + 1) to account for the bias.
+    Input should be dimension <n_batch> * <n_in>, or <n_batch> * (<n_in> + 1) if add_bias=False. Output has dimension <n_batch> * <n_out>
     '''
-    def __init__(self, n_in, n_out, n_batch, learning_rate, dropout_rate, decay_rate, init_std, add_bias=True, calc_dJ_din=True):
+    def __init__(self, n_batch, n_in, n_out, learning_rate, dropout_rate, decay_rate, init_std, add_bias=True, calc_dJ_din=True):
+        '''
+        init_std: a function that takes in n_in and n_out and returns the standard deviation used to initialize the weights
+        add_bias: by default assume that each input point has n_in values (so add_bias=True appends a 1 to the end of the inputs)
+        calc_dJ_din: by default assume that we need to calculate gradient of loss w.r.t. input. Set to false if first layer
+        '''
         self.n_in = n_in
         self.n_out = n_out
         self.n_batch = n_batch
@@ -37,7 +41,7 @@ class FullyConnectedLayer(Layer):
         self.init_std = init_std
         self.add_bias = add_bias
         self.calc_dJ_din = calc_dJ_din
-        
+
         self.input = None
         self.output = np.zeros((self.n_batch, self.n_out), dtype=float)
         self.W = np.random.normal(0, self.init_std(self.n_in, self.n_out), (self.n_out, self.n_in + 1))
@@ -68,16 +72,19 @@ class FullyConnectedLayer(Layer):
         '''
         dropout rate to 0 for prediction
         '''
-        layer = FullyConnectedLayer(self.n_in, self.n_out, n_batch, self.learning_rate, 0, self.decay_rate, self.init_std, self.add_bias, self.calc_dJ_din)
+        layer = FullyConnectedLayer(n_batch, self.n_in, self.n_out, self.learning_rate, 0, self.decay_rate, self.init_std, self.add_bias, self.calc_dJ_din)
         layer.W = self.W
         return layer
 
 class ReLULayer(Layer):
     '''
-    Apply the ReLU function. Input and output will be the same dimension (with n_batch as the first dim)
-    shape: shape of input / output for ONE sample (not one batch)
+    Apply the ReLU function. Input and output will be the same dimension.
+    Input / output should have shape <n_batch> * <shape>
     '''
-    def __init__(self, shape, n_batch):
+    def __init__(self, n_batch, shape):
+        '''
+        shape: shape of input / output for ONE sample (not one batch)
+        '''
         self.shape = shape
         self.output = np.zeros((n_batch,) + self.shape, dtype=float)
         self.dJ_din = np.zeros((n_batch,) + self.shape, dtype=float)
@@ -93,13 +100,13 @@ class ReLULayer(Layer):
         return self.dJ_din
 
     def get_clone(self, n_batch):
-        return ReLULayer(self.shape, n_batch)
+        return ReLULayer(n_batch, self.shape)
 
 class SoftmaxLayer(Layer):
     '''
     Apply the softmax function. Input and output have dimensions <n_batch> * <n_in_out>
     '''
-    def __init__(self, n_in_out, n_batch):
+    def __init__(self, n_batch, n_in_out):
         self.n_in_out = n_in_out
         self.output = np.zeros((n_batch, self.n_in_out), dtype=float)
         self.dJ_din = np.zeros((n_batch, self.n_in_out), dtype=float)
@@ -123,13 +130,13 @@ class SoftmaxLayer(Layer):
         return self.dJ_din
 
     def get_clone(self, n_batch):
-        return SoftmaxLayer(self.n_in_out, n_batch)
+        return SoftmaxLayer(n_batch, self.n_in_out)
 
 class ReshapeLayer(Layer):
     '''
-    Reshape the numpy input, but in each case <n_batch> is the first dimension
+    Reshape the input with dim <n_batch> * <shape_input> into output with shape <n_batch> * <shape_output>
     '''
-    def __init__(self, shape_input, shape_output, n_batch):
+    def __init__(self, n_batch, shape_input, shape_output):
         self.shape_input = shape_input
         self.shape_output = shape_output
         self.batch_input = (n_batch,) + shape_input
@@ -142,48 +149,99 @@ class ReshapeLayer(Layer):
         return dJ_dout.reshape(self.shape_input)
 
     def get_clone(self, n_batch):
-        return ReshapeLayer(self.shape_input, self.shape_output, n_batch)
+        return ReshapeLayer(n_batch, self.shape_input, self.shape_output)
 
-class ConvLayer(Layer):
-    def __init__(self, n_in, dim_filter, padding, stride, input_depth, output_depth, n_batch, learning_rate, dropout_rate, decay_rate, add_bias):
-        self.dim_input = int(np.sqrt(n_in))
-        assert(dim_input ** 2 == n_in)
-        assert(dim_filter < dim_input)
-        self.dim_output = (dim_input - dim_filter + 2 * padding) // stride + 1
-        super().__init__(n_in, dim_output ** 2, n_batch, learning_rate, dropout_rate, decay_rate)
-        self.n_filter = dim_filter ** 2
-        self.input = None
-        self.padding = padding
-        self.stride = stride
-        self.input_depth = input_depth
-        self.output_depth = output_depth
-
-        self.W = np.random.normal(0, np.sqrt(2.0 / (n_in + n_out + 1)), (n_batch, output_depth, input_depth, n_filter))
-        self.output = np.zeros((n_batch, n_out), dtype=float)
-        self.dJ_dWin = np.zeros((n_batch, n_out), dtype=float)
-        self.dJ_dW = np.zeros((n_out, n_in + 1), dtype=float)
-        self.dJ_din = np.zeros((n_batch, n_in), dtype=float)
-        self.add_bias = add_bias
-        self.calculate_dJ_din = calculate_dJ_din
+class TransposeLayer(Layer):
+    '''
+    Reshape the input into output with the order (0, <i + 1 for i in transposition>)
+    In other words don't pass in the batch dimension as a transposition argument
+    '''
+    def __init__(self, n_batch, transposition):
+        '''
+        transposition: per SAMPLE, should be 0 indexed
+        '''
+        self.transposition = tuple([0] + [x + 1 for x in transposition])
+        reverse_transpostion = [0 for i in self.transposition]
+        for i, x in enumerate(self.transposition):
+            reverse_transpostion[x] = i
+        self.reverse_transpostion = tuple(reverse_transpostion)
 
     def forward(self, input):
-        self.input = self.process_input(input, self.add_bias)
-        np.dot(self.input, self.W.T, out=self.output)
-        self.output[self.output < 0] = 0
+        return input.transpose(self.transposition)
+
+    def backward(self, dJ_dout):
+        return dJ_dout.reshape(self.reverse_transpostion)
+
+    def get_clone(self, n_batch):
+        return TransposeLayer(n_batch, self.transposition)
+
+class ConvolutionLayer(Layer):
+    '''
+    Convolves input with W to get output. Assume square symmetry for input, W, and output
+    Input should have dimensions <n_batch> * <input_depth> * <dim_input> * <dim_input>
+    W has dimensions <output_depth> * <input_depth> * <dim_W> * <dim_W>
+    Output has dimensions <n_batch> * <output_depth> * <dim_output> * <dim_output>
+    '''
+    def __init__(self, n_batch, dim_input, dim_W, input_depth, output_depth, padding, stride, learning_rate, decay_rate, calc_dJ_din=True):
+        self.padding = padding
+        self.stride = stride
+        self.learning_rate = learning_rate
+        self.decay_rate = decay_rate
+        self.calc_dJ_din = calc_dJ_din
+        dim_output = (dim_input - dim_filter + 2 * padding) // stride + 1
+
+        self.input = None
+        self.W = np.random.normal(0, np.sqrt(2.0 / (n_in + n_out + 1)), (output_depth, input_depth, dim_W, dim_W))
+        self.output = np.zeros((n_batch, output_depth, dim_output, dim_output), dtype=float)
+        self.dJ_dW = np.zeros(W.shape, dtype=float)
+        self.dJ_din = np.zeros((n_batch, input_depth, dim_input, dim_input), dtype=float)
+
+    def forward(self, input):
+        self.input = input
+        conv_forward(self.input, self.W, self.padding, self.stride, self.output)
         return self.output
 
     def backward(self, dJ_dout):
-        self.dJ_dWin[self.output <= 0] = 0
-        self.dJ_dWin[self.output > 0] = 1
-        np.multiply(dJ_dout, self.dJ_dWin, out=self.dJ_dWin)
-        np.dot(self.dJ_dWin.T, self.input, out=self.dJ_dW)
-        if self.calculate_dJ_din:
-            np.dot(self.dJ_dWin, self.W[:, : self.n_in], out=self.dJ_din)
-        self.dJ_dW *= self.alpha / self.n_batch
+        conv_backward_W(dJ_dout, self.input, self.padding, self.stride, self.dJ_dW)
+        if self.calc_dJ_din:
+            conv_backward_input(dJ_dout, self.W, self.padding, self.stride, self.dJ_din)
+        self.dJ_dW *= self.learning_rate / self.n_batch
         self.W -= self.dJ_dW
         return self.dJ_din
 
-    def get_clone(self, n_batch, dropout_rate):
-        layer = ReLULayer(self.n_in, self.n_out, n_batch, self.alpha, dropout_rate, self.decay, self.add_bias, self.calculate_dJ_din)
+    def decay_learning_rate(self):
+        self.learning_rate *= self.decay_rate
+
+    def get_clone(self, n_batch):
+        _, input_depth, dim_input, _ = self.dJ_din.shape
+        _, output_depth, dim_output, _ = self.output.shape
+        dim_W = self.W.shape[2]
+        layer = ConvolutionLayer(n_batch, dim_input, dim_W, input_depth, output_depth, self.padding, self.stride, self.learning_rate, self.decay_rate, self.calc_dJ_din)
         layer.W = self.W
         return layer
+
+class MaxPoolLayer(Layer):
+    '''
+    Max over nonoverlapping <dim_pool> * <dim_pool> regions of the <dim_input> * <dim_input> input. Implicitly pad with 0's at the highest indices if necessary
+    dim_output = (<dim_input - 1>) // <dim_pool> + 1
+    '''
+    def __init__(self, n_batch, dim_input, depth, dim_pool):
+        self.dim_pool = dim_pool
+        dim_output = (dim_input - 1) // self.dim_pool + 1
+
+        self.input = None
+        self.output = np.zeros((n_batch, depth, dim_output, dim_output), dtype=float)
+        self.dJ_din = np.zeros((n_batch, depth, dim_input, dim_input), dtype=float)
+
+    def forward(self, input):
+        self.input = input
+        pool_forward(self.input, self.dim_pool, self.output)
+        return self.output
+
+    def backward(self, dJ_dout):
+        pool_backward(dJ_dout, self.input, self.output, self.dim_pool, self.dJ_din)
+        return self.dJ_din
+
+    def get_clone(self, n_batch):
+        _, depth, dim_input, _ = self.input.shape
+        return MaxPoolLayer(n_batch, dim_input, depth, self.dim_pool)

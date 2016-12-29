@@ -1,6 +1,7 @@
 import numpy as np
 cimport numpy as np
 cimport cython
+from cpython cimport bool
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -29,18 +30,14 @@ def conv_forward(np.ndarray[np.float_t, ndim=4] input, np.ndarray[np.float_t, nd
     cdef np.float_t [:, :, :, :] input_buffer = input
     cdef np.float_t [:, :, :, :] output_buffer = output
     cdef np.float_t [:, :, :, :] W_buffer = W
-    cdef np.float_t [:, :, :] input_x, output_x, W_y
     cdef np.float_t [:, :] input_xz, output_xy, W_yz
-    cdef np.float_t output_xymn
+
     for x in range(batch_size):
-        input_x = input_buffer[x]
-        output_x = output_buffer[x]
         for y in range(output_depth):
-            W_y = W_buffer[y]
-            output_xy = output_x[y]
+            output_xy = output_buffer[x, y]
             for z in range(input_depth):
-                W_yz = W_y[z]
-                input_xz = input_x[z]
+                W_yz = W_buffer[y, z]
+                input_xz = input_buffer[x, z]
                 for m in range(dim_output):
                     i = m * stride - padding
                     for a in range(dim_W):
@@ -48,7 +45,6 @@ def conv_forward(np.ndarray[np.float_t, ndim=4] input, np.ndarray[np.float_t, nd
                         if ia < 0 or ia >= dim_input:
                             continue
                         for n in range(dim_output):
-                            output_xymn = 0
                             j = n * stride - padding
                             for b in range(dim_W):
                                 jb = (j + b)
@@ -82,18 +78,14 @@ def conv_backward_W(np.ndarray[np.float_t, ndim=4] dJ_dout, np.ndarray[np.float_
     cdef np.float_t [:, :, :, :] dJ_dout_buffer = dJ_dout
     cdef np.float_t [:, :, :, :] input_buffer = input
     cdef np.float_t [:, :, :, :] dJ_dW_buffer = dJ_dW
-    cdef np.float_t [:, :, :] dJ_dout_x, input_x, dJ_dW_y
     cdef np.float_t [:, :] input_xz, dJ_dout_xy, dJ_dW_yz
 
     for x in range(batch_size):
-        dJ_dout_x = dJ_dout_buffer[x]
-        input_x = input_buffer[x]
         for y in range(output_depth):
-            dJ_dW_y = dJ_dW_buffer[y]
-            dJ_dout_xy = dJ_dout_x[y]
+            dJ_dout_xy = dJ_dout[x, y]
             for z in range(input_depth):
-                dJ_dW_yz = dJ_dW_y[z]
-                input_xz = input_x[z]
+                dJ_dW_yz = dJ_dW_buffer[y, z]
+                input_xz = input_buffer[x, z]
                 for a in range(dim_W):
                     for m in range(dim_output):
                         i = m * stride - padding
@@ -136,18 +128,14 @@ def conv_backward_input(np.ndarray[np.float_t, ndim=4] dJ_dout, np.ndarray[np.fl
     cdef np.float_t [:, :, :, :] dJ_dout_buffer = dJ_dout
     cdef np.float_t [:, :, :, :] dJ_din_buffer = dJ_din
     cdef np.float_t [:, :, :, :] W_buffer = W
-    cdef np.float_t [:, :, :] dJ_dout_x, dJ_din_x, W_y
     cdef np.float_t [:, :] dJ_dout_xy, W_yz, dJ_din_xz
 
     for x in range(batch_size):
-        dJ_dout_x = dJ_dout_buffer[x]
-        dJ_din_x = dJ_din_buffer[x]
         for y in range(output_depth):
-            W_y = W_buffer[y]
-            dJ_dout_xy = dJ_dout_x[y]
+            dJ_dout_xy = dJ_dout_buffer[x, y]
             for z in range(input_depth):
-                W_yz = W_y[z]
-                dJ_din_xz = dJ_din_x[z]
+                W_yz = W_buffer[y, z]
+                dJ_din_xz = dJ_din_buffer[x, z]
                 for i in range(dim_input):
                     ip = i + padding
                     m = ip // stride
@@ -173,3 +161,68 @@ def conv_backward_input(np.ndarray[np.float_t, ndim=4] dJ_dout, np.ndarray[np.fl
                                 b_iter += stride
                             m_iter -= 1
                             a_iter += stride
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+def pool_forward(np.ndarray[np.float_t, ndim=4] input, int dim_pool, np.ndarray[np.float_t, ndim=4] output):
+    cdef int n_batch = input.shape[0]
+    cdef int depth = input.shape[1]
+    cdef int dim_input = input.shape[2]
+    cdef int x, y # indices for batch and depth
+    cdef int i, j # indices for one input slice
+    cdef int m, n # indices for one output slice
+    cdef np.float_t [:, :, :, :] input_buffer, output_buffer
+    input_buffer = input
+    output_buffer = output
+    cdef np.float_t [:, :] input_xy, output_xy
+    cdef np.float_t input_xyij
+    for x in range(n_batch):
+        for y in range(depth):
+            input_xy = input_buffer[x, y]
+            output_xy = output_buffer[x, y]
+            for i in range(dim_input):
+                m = i // dim_pool
+                for j in range(dim_input):
+                    n = j // dim_pool
+                    input_xyij = input_xy[i, j]
+                    if input_xyij > output_xy[m, n]:
+                        output_xy[m, n] = input_xyij
+
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
+def pool_backward(np.ndarray[np.float_t, ndim=4] dJ_dout, np.ndarray[np.float_t, ndim=4] input, np.ndarray[np.float_t, ndim=4] output, int dim_pool, np.ndarray[np.float_t, ndim=4] dJ_din):
+    '''
+    ALTERS dJ_dout as a byproduct!
+    '''
+    dJ_din.fill(0)
+    cdef int n_batch = input.shape[0]
+    cdef int depth = input.shape[1]
+    cdef int dim_input = input.shape[2]
+    cdef int dim_output = output.shape[2]
+    cdef int x, y # indices for batch and depth
+    cdef int i, j # indices for one input slice
+    cdef int m, n # indices for one output slice
+    cdef np.float_t [:, :, :, :] input_buffer, output_buffer, dJ_din_buffer, dJ_dout_buffer
+    input_buffer = input
+    output_buffer = output
+    dJ_din_buffer = dJ_din
+    dJ_dout_buffer = dJ_dout
+    cdef np.float_t [:, :] input_xy, output_xy, dJ_din_xy, dJ_dout_xy
+    cdef bool found
+    for x in range(n_batch):
+        for y in range(depth):
+            input_xy = input_buffer[x, y]
+            output_xy = output_buffer[x, y]
+            dJ_din_xy = dJ_din_buffer[x, y]
+            dJ_dout_xy = dJ_dout_buffer[x, y]
+            for i in range(dim_input):
+                m = i // dim_pool
+                for j in range(dim_input):
+                    n = j // dim_pool
+                    if input_xy[i, j] == output_xy[m, n]:
+                        dJ_din_xy[i, j] = dJ_dout_xy[m, n]
+                        dJ_dout_xy[m, n] = 0
