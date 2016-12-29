@@ -1,9 +1,11 @@
 import numpy as np
 cimport numpy as np
 cimport cython
+
 @cython.boundscheck(False)
 @cython.wraparound(False)
-
+@cython.nonecheck(False)
+@cython.cdivision(True)
 def conv_forward(np.ndarray[np.float_t, ndim=3] input, np.ndarray[np.float_t, ndim=3] W, int dim_input, int dim_W, int padding, int stride, np.ndarray[np.float_t, ndim=3] output):
     '''
     input: <batch_size> * <input_depth> * <dim_input ^ 2>
@@ -53,6 +55,10 @@ def conv_forward(np.ndarray[np.float_t, ndim=3] input, np.ndarray[np.float_t, nd
                                 output_xymn += input_xz[ia * dim_input + jb] * W_yz[a * dim_W + b]
                         output_xy[m * dim_output + n] += output_xymn
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
 def conv_backward_W(np.ndarray[np.float_t, ndim=3] dJ_dout, np.ndarray[np.float_t, ndim=3] input, int dim_input, int dim_W, int padding, int stride, np.ndarray[np.float_t, ndim=3] dJ_dW):
     '''
     dJ_dout: <batch_size> * <output_depth> * <dim_input ^ 2>
@@ -102,6 +108,10 @@ def conv_backward_W(np.ndarray[np.float_t, ndim=3] dJ_dout, np.ndarray[np.float_
                                 dJ_dW_yzab += input_xz[ia * dim_input + jb] * dJ_dout_xy[m * dim_output + n]
                         dJ_dW_yz[a * dim_W + b] += dJ_dW_yzab
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.nonecheck(False)
+@cython.cdivision(True)
 def conv_backward_input(np.ndarray[np.float_t, ndim=3] dJ_dout, np.ndarray[np.float_t, ndim=3] W, int dim_input, int dim_W, int padding, int stride, np.ndarray[np.float_t, ndim=3] dJ_din):
     dJ_din.fill(0)
     cdef int batch_size = dJ_din.shape[0]
