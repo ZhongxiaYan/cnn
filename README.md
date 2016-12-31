@@ -25,8 +25,36 @@ A customizable, multilayered, and fully Numpy-parallelized/cythonized (convoluti
 `decay_rate`: `0.9`
 `init_std`: `1 / sqrt(n_in)`
 
-### Two Hidden Layers (FC1 -> ReLU -> FC2 -> Softmax)
+### Two Hidden Layers (FC1 -> ReLU -> FC2 -> ReLU -> FC3 -> Softmax)
 ##### Cross validation accuracy: **0.9849**
+##### Test accuracy: **0.9858**
+#### General parameters
+100,000 iterations with batch size of 20
+
+#### FC1 parameters
+`n_in`: `784`
+`n_out`: `800`
+`learning_rate`: `0.5`
+`dropout_rate`: `0.3`
+`decay_rate`: `0.9`
+`init_std`: `2 / sqrt(n_in + n_out + 1)`
+
+#### FC2 parameters
+`n_in`: `800`
+`n_out`: `150`
+`learning_rate`: `0.2`
+`dropout_rate`: `0.2`
+`decay_rate`: `0.9`
+`init_std`: `1 / sqrt(n_in + n_out + 1)`
+
+#### FC3 parameters
+`n_in`: `150`
+`n_out`: `10`
+`learning_rate`: `0.05`
+`dropout_rate`: `0.4`
+`decay_rate`: `0.9`
+`init_std`: `1 / sqrt(n_in)`
+
 
 ## Weighted layers:
 ### FullyConnectedLayer

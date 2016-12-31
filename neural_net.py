@@ -180,10 +180,10 @@ def create_generator_two_hidden(n_in, n_out):
         relu_FC_init = lambda n_in, n_out: 2.0 / np.sqrt(n_in + n_out + 1)
         softmax_FC_init = lambda n_in, n_out: 1.0 / np.sqrt(n_in)
 
-        FC_ReLU_1 = FullyConnectedLayer(n_batch, n_in, n_hidden1, learning_rate=5e-1, dropout_rate=0.4, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
+        FC_ReLU_1 = FullyConnectedLayer(n_batch, n_in, n_hidden1, learning_rate=5e-1, dropout_rate=0.3, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
         ReLU_1 = ReLULayer(n_batch, (n_hidden1,))
 
-        FC_ReLU_2 = FullyConnectedLayer(n_batch, n_hidden1, n_hidden2, learning_rate=1e-1, dropout_rate=0.2, decay_rate=0.9, init_std=relu_FC_init)
+        FC_ReLU_2 = FullyConnectedLayer(n_batch, n_hidden1, n_hidden2, learning_rate=2e-1, dropout_rate=0.2, decay_rate=0.9, init_std=relu_FC_init)
         ReLU_2 = ReLULayer(n_batch, (n_hidden2,))
 
         FC_softmax = FullyConnectedLayer(n_batch, n_hidden2, n_out, learning_rate=5e-2, dropout_rate=0.4, decay_rate=0.9, init_std=softmax_FC_init)
@@ -199,19 +199,21 @@ if __name__ == "__main__":
 
     # one hidden layer
     N_one_layer = 100000
-    nn_generator = create_generator_one_hidden(n_in, n_out)
+    N_two_layers = 100000
+    nn_generator_one = create_generator_one_hidden(n_in, n_out)
+    nn_generator_two = create_generator_two_hidden(n_in, n_out)
 
-    # cross validation
-    # cross_validate(X_train, labels_train, nn_generator, N_one_layer, plot=False)
+    N, nn_generator = N_two_layers, nn_generator_two
+    test = True
 
-    # test
-    nn = nn_generator()
-    nn.train(X_train, labels_train, N_one_layer)
-    labels_pred, J = nn.predict(X_test)
-    score = evaluate(labels_test, labels_pred)
-    print('Accuracy %.6f' % (score))
+    if test:
+        # test
+        nn = nn_generator()
+        nn.train(X_train, labels_train, N)
+        labels_pred, J = nn.predict(X_test)
+        score = evaluate(labels_test, labels_pred)
+        print('Accuracy %.6f' % (score))
+    else:
+        # cross validation
+        cross_validate(X_train, labels_train, nn_generator, N, plot=False)
 
-
-    # two hidden layers
-    # nn_generator = create_generator_two_hidden(n_in, n_out)
-    # cross_validate(X_train, labels_train, nn_generator, 40000, plot=False)
