@@ -10,8 +10,9 @@ from layers import *
 
 NUM_CLASSES = 10
 NUMPY_TRAIN_SAVE_PATH = 'x_train.npy'
-NUMPY_LABELS_SAVE_PATH = 'labels_train.npy'
+NUMPY_TRAIN_LABELS_SAVE_PATH = 'labels_train.npy'
 NUMPY_TEST_SAVE_PATH = 'x_test.npy'
+NUMPY_TEST_LABELS_SAVE_PATH = 'labels_test.npy'
 
 class NeuralNet:
     def __init__(self, layers, n_batch):
@@ -95,21 +96,24 @@ class NeuralNet:
         return layers[-1].forward(out, predict_only=True, labels=labels)
 
 def load_dataset(dir):
-    if os.path.exists(dir + NUMPY_TRAIN_SAVE_PATH) and os.path.exists(dir + NUMPY_TEST_SAVE_PATH) and os.path.exists(dir + NUMPY_LABELS_SAVE_PATH):
+    if np.all((os.path.exists(dir + x) for x in [NUMPY_TRAIN_SAVE_PATH, NUMPY_TRAIN_LABELS_SAVE_PATH, NUMPY_TEST_SAVE_PATH, NUMPY_TEST_LABELS_SAVE_PATH])):
         X_train = np.load(dir + NUMPY_TRAIN_SAVE_PATH)
-        labels_train = np.load(dir + NUMPY_LABELS_SAVE_PATH)
+        labels_train = np.load(dir + NUMPY_TRAIN_LABELS_SAVE_PATH)
         X_test = np.load(dir + NUMPY_TEST_SAVE_PATH)
+        labels_test = np.load(dir + NUMPY_TEST_LABELS_SAVE_PATH)
     else:
         mndata = MNIST(dir)
         X_train, labels_train = map(np.array, mndata.load_training())
-        X_test, _ = map(np.array, mndata.load_testing())
+        X_test, labels_test = map(np.array, mndata.load_testing())
         X_train = np.array(X_train)
         labels_train = np.array(labels_train)
         X_test = np.array(X_test)
+        labels_test = np.array(labels_test)
         np.save(dir + NUMPY_TRAIN_SAVE_PATH, X_train)
-        np.save(dir + NUMPY_LABELS_SAVE_PATH, labels_train)
+        np.save(dir + NUMPY_TRAIN_LABELS_SAVE_PATH, labels_train)
         np.save(dir + NUMPY_TEST_SAVE_PATH, X_test)
-    return X_train, labels_train, X_test
+        np.save(dir + NUMPY_TEST_LABELS_SAVE_PATH, labels_test)
+    return X_train, labels_train, X_test, labels_test
 
 def evaluate(labels_true, labels_pred):
     return np.sum(np.where(labels_true == labels_pred, 1, 0)) / len(labels_true)
@@ -171,32 +175,43 @@ def create_generator_two_hidden(n_in, n_out):
     '''
     def generator():
         n_batch = 20
-        n_hidden1 = 600
-        n_hidden2 = 100
+        n_hidden1 = 800
+        n_hidden2 = 150
         relu_FC_init = lambda n_in, n_out: 2.0 / np.sqrt(n_in + n_out + 1)
         softmax_FC_init = lambda n_in, n_out: 1.0 / np.sqrt(n_in)
 
-        FC_ReLU_1 = FullyConnectedLayer(n_batch, n_in, n_hidden1, learning_rate=1e-1, dropout_rate=0.05, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
+        FC_ReLU_1 = FullyConnectedLayer(n_batch, n_in, n_hidden1, learning_rate=5e-1, dropout_rate=0.4, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
         ReLU_1 = ReLULayer(n_batch, (n_hidden1,))
 
-        FC_ReLU_2 = FullyConnectedLayer(n_batch, n_hidden1, n_hidden2, learning_rate=5e-2, dropout_rate=0.2, decay_rate=0.95, init_std=relu_FC_init)
+        FC_ReLU_2 = FullyConnectedLayer(n_batch, n_hidden1, n_hidden2, learning_rate=1e-1, dropout_rate=0.2, decay_rate=0.9, init_std=relu_FC_init)
         ReLU_2 = ReLULayer(n_batch, (n_hidden2,))
 
-        FC_softmax = FullyConnectedLayer(n_batch, n_hidden2, n_out, learning_rate=5e-2, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_FC_init)
+        FC_softmax = FullyConnectedLayer(n_batch, n_hidden2, n_out, learning_rate=5e-2, dropout_rate=0.4, decay_rate=0.9, init_std=softmax_FC_init)
         softmax = SoftmaxLayer(n_batch, n_out)
 
         return NeuralNet([FC_ReLU_1, ReLU_1, FC_ReLU_2, ReLU_2, FC_softmax, softmax], n_batch)
     return generator
 
 if __name__ == "__main__":
-    X_train, labels_train, X_test = load_dataset('./data/')
+    X_train, labels_train, X_test, labels_test = load_dataset('./data/')
     n_in = X_train.shape[1]
     n_out = NUM_CLASSES
 
     # one hidden layer
-    # nn_generator = create_generator_one_hidden(n_in, n_out)
-    # cross_validate(X_train, labels_train, nn_generator, 100000, plot=False)
+    N_one_layer = 100000
+    nn_generator = create_generator_one_hidden(n_in, n_out)
+
+    # cross validation
+    # cross_validate(X_train, labels_train, nn_generator, N_one_layer, plot=False)
+
+    # test
+    nn = nn_generator()
+    nn.train(X_train, labels_train, N_one_layer)
+    labels_pred, J = nn.predict(X_test)
+    score = evaluate(labels_test, labels_pred)
+    print('Accuracy %.6f' % (score))
+
 
     # two hidden layers
-    nn_generator = create_generator_two_hidden(n_in, n_out)
-    cross_validate(X_train, labels_train, nn_generator, 50000, plot=False)
+    # nn_generator = create_generator_two_hidden(n_in, n_out)
+    # cross_validate(X_train, labels_train, nn_generator, 40000, plot=False)

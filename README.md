@@ -5,6 +5,7 @@ A customizable, multilayered, and fully Numpy-parallelized/cythonized (convoluti
 ## Results:
 ### Single Hidden Layer (FC1 -> ReLU -> FC2 -> Softmax)
 ##### Cross validation accuracy: **0.9845**
+##### Test accuracy: **0.9858**
 #### General parameters
 100,000 iterations with batch size of 20
 
@@ -23,6 +24,9 @@ A customizable, multilayered, and fully Numpy-parallelized/cythonized (convoluti
 `dropout_rate`: `0.5`
 `decay_rate`: `0.9`
 `init_std`: `1 / sqrt(n_in)`
+
+### Two Hidden Layers (FC1 -> ReLU -> FC2 -> Softmax)
+##### Cross validation accuracy: **0.9849**
 
 ## Weighted layers:
 ### FullyConnectedLayer
