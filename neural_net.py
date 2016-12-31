@@ -13,7 +13,7 @@ NUMPY_TRAIN_SAVE_PATH = 'x_train.npy'
 NUMPY_LABELS_SAVE_PATH = 'labels_train.npy'
 NUMPY_TEST_SAVE_PATH = 'x_test.npy'
 
-class NN:
+class NeuralNet:
     def __init__(self, layers, n_batch):
         '''
         layers: list - hidden layers followed by a single output (softmax) layer
@@ -142,23 +142,50 @@ def cross_validate(X, labels, nn_generator, iterations, fold=5, plot=False):
     print('Overall CV accuracy %.6f' % (score))
     return score
 
-def create_generator(n_in, n_out):
+def create_generator_one_hidden(n_in, n_out):
     '''
-    returns a neural net generator given the input and output dimensions
-    tweak the neural net hyperparameters here
+    returns a single hidden layer neural net generator given the input and output dimensions
+    contains settings for the neural net hyperparameters
+    FC-ReLU-FC-softmax
     '''
     def generator():
         n_batch = 20
-        n_hidden1 = 400
-        n_hidden2 = 100
-        relu_FC_init = lambda n_in, n_out: np.sqrt(2.0 / (n_in + n_out + 1))
-        softmax_FC_init = lambda n_in, n_out: np.sqrt(1.0 / (n_in))
-        FC_ReLU_1 = FullyConnectedLayer(n_batch, n_in, n_hidden1, learning_rate=5e-1, dropout_rate=0.05, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
-        ReLU_1 = ReLULayer(n_batch, (n_hidden1,))
-        # ReLU_2 = ReLULayer(n_hidden1, n_hidden2, n_batch, learning_rate=5e-2, dropout_rate=0.1, decay_rate=0.9)
-        FC_softmax = FullyConnectedLayer(n_batch, n_hidden1, n_out, learning_rate=2e-2, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_FC_init)
+        n_hidden = 700
+        relu_FC_init = lambda n_in, n_out: 2.0 / np.sqrt(n_in + n_out + 1)
+        softmax_FC_init = lambda n_in, n_out: 1.0 / np.sqrt(n_in)
+
+        # hidden layer
+        FC_ReLU = FullyConnectedLayer(n_batch, n_in, n_hidden, learning_rate=5e-1, dropout_rate=0.3, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
+        ReLU = ReLULayer(n_batch, (n_hidden,))
+
+        # softmax layer
+        FC_softmax = FullyConnectedLayer(n_batch, n_hidden, n_out, learning_rate=1e-1, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_FC_init)
         softmax = SoftmaxLayer(n_batch, n_out)
-        return NN([FC_ReLU_1, ReLU_1, FC_softmax, softmax], n_batch)
+
+        return NeuralNet([FC_ReLU, ReLU, FC_softmax, softmax], n_batch)
+    return generator
+
+def create_generator_two_hidden(n_in, n_out):
+    '''
+    FC-ReLU-FC-ReLU-FC-softmax
+    '''
+    def generator():
+        n_batch = 20
+        n_hidden1 = 600
+        n_hidden2 = 100
+        relu_FC_init = lambda n_in, n_out: 2.0 / np.sqrt(n_in + n_out + 1)
+        softmax_FC_init = lambda n_in, n_out: 1.0 / np.sqrt(n_in)
+
+        FC_ReLU_1 = FullyConnectedLayer(n_batch, n_in, n_hidden1, learning_rate=1e-1, dropout_rate=0.05, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
+        ReLU_1 = ReLULayer(n_batch, (n_hidden1,))
+
+        FC_ReLU_2 = FullyConnectedLayer(n_batch, n_hidden1, n_hidden2, learning_rate=5e-2, dropout_rate=0.2, decay_rate=0.95, init_std=relu_FC_init)
+        ReLU_2 = ReLULayer(n_batch, (n_hidden2,))
+
+        FC_softmax = FullyConnectedLayer(n_batch, n_hidden2, n_out, learning_rate=5e-2, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_FC_init)
+        softmax = SoftmaxLayer(n_batch, n_out)
+
+        return NeuralNet([FC_ReLU_1, ReLU_1, FC_ReLU_2, ReLU_2, FC_softmax, softmax], n_batch)
     return generator
 
 if __name__ == "__main__":
@@ -166,5 +193,10 @@ if __name__ == "__main__":
     n_in = X_train.shape[1]
     n_out = NUM_CLASSES
 
-    nn_generator = create_generator(n_in, n_out)
+    # one hidden layer
+    # nn_generator = create_generator_one_hidden(n_in, n_out)
+    # cross_validate(X_train, labels_train, nn_generator, 100000, plot=False)
+
+    # two hidden layers
+    nn_generator = create_generator_two_hidden(n_in, n_out)
     cross_validate(X_train, labels_train, nn_generator, 50000, plot=False)

@@ -191,7 +191,7 @@ class ConvolutionLayer(Layer):
         dim_output = (dim_input - dim_filter + 2 * padding) // stride + 1
 
         self.input = None
-        self.W = np.random.normal(0, np.sqrt(2.0 / (n_in + n_out + 1)), (output_depth, input_depth, dim_W, dim_W))
+        self.W = np.random.normal(0, 1.0 / np.sqrt(input_depth * dim_W ** 2), (output_depth, input_depth, dim_W, dim_W))
         self.output = np.zeros((n_batch, output_depth, dim_output, dim_output), dtype=float)
         self.dJ_dW = np.zeros(W.shape, dtype=float)
         self.dJ_din = np.zeros((n_batch, input_depth, dim_input, dim_input), dtype=float)
