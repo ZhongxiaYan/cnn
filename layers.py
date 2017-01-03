@@ -137,19 +137,17 @@ class ReshapeLayer(Layer):
     Reshape the input with dim <n_batch> * <shape_input> into output with shape <n_batch> * <shape_output>
     '''
     def __init__(self, n_batch, shape_input, shape_output):
-        self.shape_input = shape_input
-        self.shape_output = shape_output
         self.batch_input = (n_batch,) + shape_input
         self.batch_output = (n_batch,) + shape_output
 
     def forward(self, input):
-        return input.reshape(self.shape_output)
+        return input.reshape(self.batch_output)
 
     def backward(self, dJ_dout):
-        return dJ_dout.reshape(self.shape_input)
+        return dJ_dout.reshape(self.batch_input)
 
     def get_clone(self, n_batch):
-        return ReshapeLayer(n_batch, self.shape_input, self.shape_output)
+        return ReshapeLayer(n_batch, self.batch_input[1:], self.batch_output[1:])
 
 class TransposeLayer(Layer):
     '''
@@ -183,18 +181,19 @@ class ConvolutionLayer(Layer):
     Output has dimensions <n_batch> * <output_depth> * <dim_output> * <dim_output>
     '''
     def __init__(self, n_batch, dim_input, dim_W, input_depth, output_depth, padding, stride, learning_rate, decay_rate, calc_dJ_din=True):
+        self.n_batch = n_batch
         self.padding = padding
         self.stride = stride
         self.learning_rate = learning_rate
         self.decay_rate = decay_rate
         self.calc_dJ_din = calc_dJ_din
-        dim_output = (dim_input - dim_filter + 2 * padding) // stride + 1
+        dim_output = (dim_input - dim_W + 2 * padding) // stride + 1
 
         self.input = None
         self.W = np.random.normal(0, 1.0 / np.sqrt(input_depth * dim_W ** 2), (output_depth, input_depth, dim_W, dim_W))
-        self.output = np.zeros((n_batch, output_depth, dim_output, dim_output), dtype=float)
-        self.dJ_dW = np.zeros(W.shape, dtype=float)
-        self.dJ_din = np.zeros((n_batch, input_depth, dim_input, dim_input), dtype=float)
+        self.output = np.zeros((self.n_batch, output_depth, dim_output, dim_output), dtype=float)
+        self.dJ_dW = np.zeros(self.W.shape, dtype=float)
+        self.dJ_din = np.zeros((self.n_batch, input_depth, dim_input, dim_input), dtype=float)
 
     def forward(self, input):
         self.input = input

@@ -15,21 +15,26 @@ NUMPY_TEST_SAVE_PATH = 'x_test.npy'
 NUMPY_TEST_LABELS_SAVE_PATH = 'labels_test.npy'
 
 class NeuralNet:
-    def __init__(self, layers, n_batch):
+    def __init__(self, layers, n_batch, add_bias=True, n_test_batch=None):
         '''
         layers: list - hidden layers followed by a single output (softmax) layer
         n_batch: batch size
+        n_test_batch: uses size of test set if set to None, else use value
         '''
         self.layers = layers
         self.n_batch = n_batch
+        self.add_bias = add_bias
         self.X_mean = None
+        self.n_test_batch = n_test_batch
 
     def preprocess_X(self, X):
         X_out = X / 255.0
         if self.X_mean is None:
             self.X_mean = np.mean(X_out, axis=0)
         X_out -= self.X_mean
-        return np.concatenate((X_out, np.ones((X_out.shape[0], 1))), axis=1)
+        if self.add_bias:
+            return np.concatenate((X_out, np.ones((X_out.shape[0], 1))), axis=1)
+        return X_out
 
     def preprocess_labels(self, labels):
         labels_one_hot = np.zeros((labels.shape[0], NUM_CLASSES))
@@ -38,9 +43,8 @@ class NeuralNet:
 
     def iterate(self, x, labels):
         '''
-        x: <batch_size> by <n_input + 1>
+        x: <batch_size> by <n_input + 1> or <batch_size> by <n_input> if self.add_bias=False
         labels: <batch_size> by <n_out>
-        :return:
         '''
         out = x
         for layer in self.layers:
@@ -59,6 +63,7 @@ class NeuralNet:
         if plot and self.n_batch == 1:
             calc_loss_thres = 10000
         print_interval = iterations // 10
+        calc_loss_thres = min(calc_loss_thres, print_interval * self.n_batch)
         epoch_count = 0
         accuracy_scores = []
         losses = []
@@ -89,30 +94,37 @@ class NeuralNet:
         if labels is None: # we're predicting test data in this case
             X = self.preprocess_X(X)
         N = len(X)
-        layers = [layer.get_clone(N) for layer in self.layers]
-        out = X
-        for layer in itertools.islice(layers, len(layers) - 1):
-            out = layer.forward(out)
-        return layers[-1].forward(out, predict_only=True, labels=labels)
+        if self.n_test_batch is None:
+            layers = [layer.get_clone(N) for layer in self.layers]
+            out = X
+            for layer in itertools.islice(layers, len(layers) - 1):
+                out = layer.forward(out)
+            return layers[-1].forward(out, predict_only=True, labels=labels)
+        else:
+            N = self.n_test_batch
+            layers = [layer.get_clone(N) for layer in self.layers]
+            output = np.zeros(len(X), dtype=int)
+            J = 0
+            for start in range(0, len(X), N):
+                out = X[start : start + N]
+                for layer in itertools.islice(layers, len(layers) - 1):
+                    out = layer.forward(out)
+                labels_i = None if labels is None else labels[start : start + N]
+                output_i, J_i = layers[-1].forward(out, predict_only=True, labels=labels_i)
+                output[start : start + N] = output_i
+                J += J_i
+            return output, J
 
 def load_dataset(dir):
-    if np.all((os.path.exists(dir + x) for x in [NUMPY_TRAIN_SAVE_PATH, NUMPY_TRAIN_LABELS_SAVE_PATH, NUMPY_TEST_SAVE_PATH, NUMPY_TEST_LABELS_SAVE_PATH])):
-        X_train = np.load(dir + NUMPY_TRAIN_SAVE_PATH)
-        labels_train = np.load(dir + NUMPY_TRAIN_LABELS_SAVE_PATH)
-        X_test = np.load(dir + NUMPY_TEST_SAVE_PATH)
-        labels_test = np.load(dir + NUMPY_TEST_LABELS_SAVE_PATH)
+    file_paths = [NUMPY_TRAIN_SAVE_PATH, NUMPY_TRAIN_LABELS_SAVE_PATH, NUMPY_TEST_SAVE_PATH, NUMPY_TEST_LABELS_SAVE_PATH]
+    if np.all((os.path.exists(dir + x) for x in file_paths)):
+        X_train, labels_train, X_test, labels_test = [np.load(dir + x) for x in file_paths]
     else:
         mndata = MNIST(dir)
-        X_train, labels_train = map(np.array, mndata.load_training())
-        X_test, labels_test = map(np.array, mndata.load_testing())
-        X_train = np.array(X_train)
-        labels_train = np.array(labels_train)
-        X_test = np.array(X_test)
-        labels_test = np.array(labels_test)
-        np.save(dir + NUMPY_TRAIN_SAVE_PATH, X_train)
-        np.save(dir + NUMPY_TRAIN_LABELS_SAVE_PATH, labels_train)
-        np.save(dir + NUMPY_TEST_SAVE_PATH, X_test)
-        np.save(dir + NUMPY_TEST_LABELS_SAVE_PATH, labels_test)
+        X_train, labels_train = [np.array(x) for x in map(np.array, mndata.load_training())]
+        X_test, labels_test = [np.array(x) for x in map(np.array, mndata.load_testing())]
+        for file_path, data in zip(file_paths, [X_train, labels_train, X_test, labels_test]):
+            np.save(dir + file_path, data)
     return X_train, labels_train, X_test, labels_test
 
 def evaluate(labels_true, labels_pred):
@@ -155,18 +167,18 @@ def create_generator_one_hidden(n_in, n_out):
     def generator():
         n_batch = 20
         n_hidden = 700
-        relu_FC_init = lambda n_in, n_out: 2.0 / np.sqrt(n_in + n_out + 1)
-        softmax_FC_init = lambda n_in, n_out: 1.0 / np.sqrt(n_in)
+        relu_fc_init = lambda n_in, n_out: 2.0 / np.sqrt(n_in + n_out + 1)
+        softmax_fc_init = lambda n_in, n_out: 1.0 / np.sqrt(n_in)
 
         # hidden layer
-        FC_ReLU = FullyConnectedLayer(n_batch, n_in, n_hidden, learning_rate=5e-1, dropout_rate=0.3, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
-        ReLU = ReLULayer(n_batch, (n_hidden,))
+        fc_1 = FullyConnectedLayer(n_batch, n_in, n_hidden, learning_rate=5e-1, dropout_rate=0.3, decay_rate=0.9, init_std=relu_fc_init, add_bias=False, calc_dJ_din=False)
+        relu_fc_1 = ReLULayer(n_batch, (n_hidden,))
 
         # softmax layer
-        FC_softmax = FullyConnectedLayer(n_batch, n_hidden, n_out, learning_rate=1e-1, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_FC_init)
+        fc_softmax = FullyConnectedLayer(n_batch, n_hidden, n_out, learning_rate=1e-1, dropout_rate=0.5, decay_rate=0.9, init_std=softmax_fc_init)
         softmax = SoftmaxLayer(n_batch, n_out)
 
-        return NeuralNet([FC_ReLU, ReLU, FC_softmax, softmax], n_batch)
+        return NeuralNet([fc_1, relu_fc_1, fc_softmax, softmax], n_batch)
     return generator
 
 def create_generator_two_hidden(n_in, n_out):
@@ -175,24 +187,85 @@ def create_generator_two_hidden(n_in, n_out):
     '''
     def generator():
         n_batch = 20
-        n_hidden1 = 800
-        n_hidden2 = 150
-        relu_FC_init = lambda n_in, n_out: 2.0 / np.sqrt(n_in + n_out + 1)
-        softmax_FC_init = lambda n_in, n_out: 1.0 / np.sqrt(n_in)
+        n_hidden_1 = 800
+        n_hidden_2 = 150
+        relu_fc_init = lambda n_in, n_out: 2.0 / np.sqrt(n_in + n_out + 1)
+        softmax_fc_init = lambda n_in, n_out: 1.0 / np.sqrt(n_in)
 
-        FC_ReLU_1 = FullyConnectedLayer(n_batch, n_in, n_hidden1, learning_rate=5e-1, dropout_rate=0.3, decay_rate=0.9, init_std=relu_FC_init, add_bias=False, calc_dJ_din=False)
-        ReLU_1 = ReLULayer(n_batch, (n_hidden1,))
+        # hidden layer 1
+        fc_1 = FullyConnectedLayer(n_batch, n_in, n_hidden_1, learning_rate=5e-1, dropout_rate=0.3, decay_rate=0.9, init_std=relu_fc_init, add_bias=False, calc_dJ_din=False)
+        relu_fc_1 = ReLULayer(n_batch, (n_hidden_1,))
 
-        FC_ReLU_2 = FullyConnectedLayer(n_batch, n_hidden1, n_hidden2, learning_rate=2e-1, dropout_rate=0.2, decay_rate=0.9, init_std=relu_FC_init)
-        ReLU_2 = ReLULayer(n_batch, (n_hidden2,))
+        # hidden layer 2
+        fc_2 = FullyConnectedLayer(n_batch, n_hidden_1, n_hidden_2, learning_rate=2e-1, dropout_rate=0.2, decay_rate=0.9, init_std=relu_fc_init)
+        relu_fc_2 = ReLULayer(n_batch, (n_hidden_2,))
 
-        FC_softmax = FullyConnectedLayer(n_batch, n_hidden2, n_out, learning_rate=5e-2, dropout_rate=0.4, decay_rate=0.9, init_std=softmax_FC_init)
+        # softmax layer
+        fc_softmax = FullyConnectedLayer(n_batch, n_hidden_2, n_out, learning_rate=5e-2, dropout_rate=0.4, decay_rate=0.9, init_std=softmax_fc_init)
         softmax = SoftmaxLayer(n_batch, n_out)
 
-        return NeuralNet([FC_ReLU_1, ReLU_1, FC_ReLU_2, ReLU_2, FC_softmax, softmax], n_batch)
+        return NeuralNet([fc_1, relu_fc_1, fc_2, relu_fc_2, fc_softmax, softmax], n_batch)
     return generator
 
-if __name__ == "__main__":
+def create_generator_LeNet(n_in, n_out):
+    '''
+    Based on LeNet architecture
+    Reshape-Conv-ReLU-Pool-Conv-ReLU-Pool-Reshape-FC-ReLU-FC-Softmax
+    '''
+    def generator():
+        n_batch = 20
+        n_image_dim = 28
+        depth_initial = 1
+
+        # reshape layer to prepare for conv
+        reshape_with_depth = ReshapeLayer(n_batch, (n_image_dim ** 2,), (depth_initial, n_image_dim, n_image_dim))
+
+        # conv, relu, pool 1
+        dim_input_conv_1 = n_image_dim
+        dim_W_1 = 5
+        output_depth_1 = 6
+        padding_1 = 2
+        stride_1 = 1
+        dim_pool_1 = 2
+        conv_1 = ConvolutionLayer(n_batch, dim_input_conv_1, dim_W_1, depth_initial, output_depth_1, padding_1, stride_1, learning_rate=5e-1, decay_rate=0.9, calc_dJ_din=False)
+        dim_output_conv_1 = conv_1.output.shape[2]
+        relu_1 = ReLULayer(n_batch, (output_depth_1, dim_output_conv_1, dim_output_conv_1))
+        pool_1 = MaxPoolLayer(n_batch, dim_output_conv_1, output_depth_1, dim_pool_1)
+        dim_output_pool_1 = pool_1.output.shape[2]
+
+        # conv, relu, pool 2
+        dim_input_conv_2 = dim_output_pool_1
+        dim_W_2 = 5
+        input_depth_2 = output_depth_1
+        output_depth_2 = 16
+        padding_2 = 0
+        stride_2 = 1
+        dim_pool_2 = 2
+        conv_2 = ConvolutionLayer(n_batch, dim_input_conv_2, dim_W_2, input_depth_2, output_depth_2, padding_2, stride_2, learning_rate=1e-1, decay_rate=0.9)
+        dim_output_conv_2 = conv_2.output.shape[2]
+        relu_2 = ReLULayer(n_batch, (output_depth_2, dim_output_conv_2, dim_output_conv_2))
+        pool_2 = MaxPoolLayer(n_batch, dim_output_conv_2, output_depth_2, dim_pool_2)
+        dim_output_pool_2 = pool_2.output.shape[2]
+
+        # reshape layer to prepare for fc
+        n_reshape_output = output_depth_2 * dim_output_pool_2 ** 2
+        reshape_without_depth = ReshapeLayer(n_batch, (output_depth_2, dim_output_pool_2, dim_output_pool_2), (n_reshape_output,))
+
+        # fc, relu
+        n_hidden = 300
+        relu_fc_init = lambda n_in, n_out: 2.0 / np.sqrt(n_in + n_out + 1)
+        fc = FullyConnectedLayer(n_batch, n_reshape_output, n_hidden, learning_rate=5e-1, dropout_rate=0, decay_rate=0.9, init_std=relu_fc_init)
+        relu_fc = ReLULayer(n_batch, (n_hidden,))
+
+        # fc, softmax
+        softmax_fc_init = lambda n_in, n_out: 1.0 / np.sqrt(n_in)
+        fc_softmax = FullyConnectedLayer(n_batch, n_hidden, n_out, learning_rate=5e-1, dropout_rate=0, decay_rate=0.9, init_std=softmax_fc_init)
+        softmax = SoftmaxLayer(n_batch, n_out)
+
+        return NeuralNet([reshape_with_depth, conv_1, relu_1, pool_1, conv_2, relu_2, pool_2, reshape_without_depth, fc, relu_fc, fc_softmax, softmax], n_batch, add_bias=False, n_test_batch=2000)
+    return generator
+
+if __name__ == '__main__':
     X_train, labels_train, X_test, labels_test = load_dataset('./data/')
     n_in = X_train.shape[1]
     n_out = NUM_CLASSES
@@ -200,10 +273,12 @@ if __name__ == "__main__":
     # one hidden layer
     N_one_layer = 100000
     N_two_layers = 100000
+    N_lenet = 30000
     nn_generator_one = create_generator_one_hidden(n_in, n_out)
     nn_generator_two = create_generator_two_hidden(n_in, n_out)
+    nn_generator_lenet = create_generator_LeNet(n_in, n_out)
 
-    N, nn_generator = N_two_layers, nn_generator_two
+    N, nn_generator = N_lenet, nn_generator_lenet
     test = True
 
     if test:

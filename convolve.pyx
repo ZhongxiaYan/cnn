@@ -167,6 +167,7 @@ def conv_backward_input(np.ndarray[np.float_t, ndim=4] dJ_dout, np.ndarray[np.fl
 @cython.nonecheck(False)
 @cython.cdivision(True)
 def pool_forward(np.ndarray[np.float_t, ndim=4] input, int dim_pool, np.ndarray[np.float_t, ndim=4] output):
+    output.fill(0)
     cdef int n_batch = input.shape[0]
     cdef int depth = input.shape[1]
     cdef int dim_input = input.shape[2]
