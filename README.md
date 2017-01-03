@@ -4,8 +4,8 @@ A customizable, multilayered, and fully Numpy-parallelized/cythonized (convoluti
 
 ## Results:
 ### Single Hidden Layer (FC1 -> ReLU -> FC2 -> Softmax)
-##### Cross validation accuracy: **0.9845**
-##### Test accuracy: **0.9858**
+Cross validation accuracy: **0.9845**
+Test accuracy: **0.9858**
 #### General parameters
 100,000 iterations with batch size of 20
 
@@ -26,8 +26,8 @@ A customizable, multilayered, and fully Numpy-parallelized/cythonized (convoluti
 `init_std`: `1 / sqrt(n_in)`
 
 ### Two Hidden Layers (FC1 -> ReLU -> FC2 -> ReLU -> FC3 -> Softmax)
-##### Cross validation accuracy: **0.9849**
-##### Test accuracy: **0.9858**
+Cross validation accuracy: **0.9849**
+Test accuracy: **0.9858**
 #### General parameters
 100,000 iterations with batch size of 20
 
@@ -56,8 +56,8 @@ A customizable, multilayered, and fully Numpy-parallelized/cythonized (convoluti
 `init_std`: `1 / sqrt(n_in)`
 
 ### LeNet / Convolution Layers (Reshape -> Conv1 -> ReLU -> Pool -> Conv2 -> ReLU -> Pool -> Reshape -> FC1 -> ReLU -> FC2 -> Softmax)
-##### Cross validation accuracy: **0.9918**
-##### Test accuracy: **0.9917**
+Cross validation accuracy: **0.9918**
+Test accuracy: **0.9917**
 #### General parameters
 30,000 iterations with batch size of 20.
 
@@ -111,7 +111,16 @@ Output has dimensions `n_batch * output_depth * dim_output * dim_output`, where 
 
 ## Weightless layers:
 ### ReLULayer
+Applies ReLU activation to input of a given shape (`n_batch` * ...) .
+
 ### SoftmaxLayer
+Applies Softmax activation to a input (`n_batch` * `n_in_out`). Usually used as the output layer for classification.
+
 ### MaxPoolLayer
+Takes the maximum of a `dim_pool * dim_pool` grid of the input. Pad the largest indices with 0 if necessary.
+
 ### ReshapeLayer
+Reshape the input with Numpy reshape.
+
 ### TransposeLayer
+Transpose the input with Numpy transpose.
