@@ -64,20 +64,20 @@ Test accuracy: **0.9917**
 #### Conv1 parameters
 `dim_input`: `28`
 `dim_W`: `5`
-`input_depth`: 1
-`output_depth`: 6
-`padding`: 2
-`stride`: 1
+`input_depth`: `1`
+`output_depth`: `6`
+`padding`: `2`
+`stride`: `1`
 `learning_rate`: `0.5`
 `decay_rate`: `0.9`
 
 #### Conv2 parameters
 `dim_input`: `14`
 `dim_W`: `5`
-`input_depth`: 6
-`output_depth`: 16
-`padding`: 0
-`stride`: 1
+`input_depth`: `6`
+`output_depth`: `16`
+`padding`: `0`
+`stride`: `1`
 `learning_rate`: `0.1`
 `decay_rate`: `0.9`
 
